@@ -1,0 +1,13 @@
+package uz.jarvis.user.history;
+
+public enum Label {
+  // AGENT LABELS
+  OFFER_STARTED, OFFER_CANCELED,
+  FULL_NAME_ASKED,
+  TYPE_ASKING,
+  TYPE_ASKED,
+  LOCATION_LATITUDE, LOCATION_LONGITUDE,
+
+
+
+}
