@@ -1,6 +1,6 @@
 package uz.jarvis.service;
 
-import org.telegram.telegrambots.meta.api.methods.send.SendLocation;
+import org.telegram.telegrambots.meta.api.methods.send.SendPhoto;
 import org.telegram.telegrambots.meta.api.methods.updatingmessages.DeleteMessage;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.ReplyKeyboardMarkup;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.KeyboardButton;
@@ -122,11 +122,9 @@ public class TelegramBot extends TelegramLongPollingBot {
 
               userHistoryService.clearHistory(chatId);
               userHistoryService.create(Label.OFFER_STARTED, chatId, "NO_VALUE");
-            }
-            else if (messageText.equals("\uD83D\uDD19 Bosh menyuga qaytish")) {
+            } else if (messageText.equals("\uD83D\uDD19 Bosh menyuga qaytish")) {
               sendMessageWithKeyboardButtons(chatId, "Bosh menyu \uD83C\uDFD8", List.of("Plan \uD83D\uDCED", "Hisobot \uD83D\uDCDD"));
-            }
-            else if (messageText.equals("Bekor qilish \uD83D\uDD19")) {
+            } else if (messageText.equals("Bekor qilish \uD83D\uDD19")) {
               sendMessageWithKeyboardButtons(chatId, "Bosh menyu \uD83C\uDFD8", List.of("Plan \uD83D\uDCED", "Hisobot \uD83D\uDCDD"));
               userHistoryService.clearHistory(chatId);
             }
@@ -148,8 +146,7 @@ public class TelegramBot extends TelegramLongPollingBot {
                   sendMessageWithKeyboardButtons(chatId, "<b>Daraxt turini tanlang:</b>", models);
 
                   userHistoryService.create(Label.TYPE_ASKING, chatId, "NO_VALUE");
-                }
-                else if (lastLabelByChatId.equals(Label.TYPE_ASKING)) {
+                } else if (lastLabelByChatId.equals(Label.TYPE_ASKING)) {
                   userHistoryService.create(Label.TYPE_ASKED, chatId, "NO_VALUE");
 
                   SendMessage sendMessage = new SendMessage();
@@ -176,45 +173,66 @@ public class TelegramBot extends TelegramLongPollingBot {
 
                   try {
                     execute(sendMessage);
-                  } catch (TelegramApiException ignored) {}
+                    userHistoryService.create(Label.TREE_LOCATION_ASKING, chatId, "NO_VALUE");
+                  } catch (TelegramApiException ignored) {
+                  }
                 }
               }
             }
-          }
-
-          else if (role.equals(Role.ROLE_USER)) {
+          } else if (role.equals(Role.ROLE_USER)) {
           } else if (role.equals(Role.ROLE_OWNER)) {
           }
         }
+
         else if (update.hasMessage() && update.getMessage().hasLocation()) {
-          Location location = update.getMessage().getLocation();
+          Label lastLabelByChatId = userHistoryService.getLastLabelByChatId(chatId);
+          if (lastLabelByChatId.equals(Label.TREE_LOCATION_ASKING)) {
+            Location location = update.getMessage().getLocation();
+            double latitude = location.getLatitude();
+            double longitude = location.getLongitude();
 
-          double latitude = location.getLatitude();
-          double longitude = location.getLongitude();
+            userHistoryService.create(Label.LOCATION_LATITUDE, chatId, String.valueOf(latitude));
+            userHistoryService.create(Label.LOCATION_LONGITUDE, chatId, String.valueOf(longitude));
 
-          userHistoryService.create(Label.LOCATION_LATITUDE, chatId, String.valueOf(latitude));
-          userHistoryService.create(Label.LOCATION_LONGITUDE, chatId, String.valueOf(longitude));
+            sendMessage(chatId, "<b>Daraxt rasmini jo'nating.</b>");
 
-          sendMessage(chatId, "<b>Daraxt rasmini jo'nating.</b>");
+            userHistoryService.create(Label.TREE_PHOTO_ASKING, chatId, String.valueOf(longitude));
+          }
         }
 
         if (update.hasMessage() && update.getMessage().hasPhoto()) {
-          List<PhotoSize> photos = update.getMessage().getPhoto();
-          // Sort photos by file size, to get the largest one
-          photos.sort(Comparator.comparing(PhotoSize::getFileSize).reversed());
+          Label lastLabelByChatId = userHistoryService.getLastLabelByChatId(chatId);
 
-          PhotoSize photo = photos.get(0); // Get the highest resolution photo
-          String fileId = photo.getFileId();
+          if (lastLabelByChatId.equals(Label.TREE_PHOTO_ASKING)) {
+            sendMessage(chatId, "<b>Daraxt muvafaqqiyatli yaratildi!</b>");
 
-          try {
-            java.io.File localFile = downloadPhoto(fileId);
-            System.out.println("Photo saved to: " + localFile.getAbsolutePath());
+            List<PhotoSize> photos = update.getMessage().getPhoto();
+            // Sort photos by file size, to get the largest one
+            photos.sort(Comparator.comparing(PhotoSize::getFileSize).reversed());
 
+            PhotoSize photo = photos.get(0); // Get the highest resolution photo
+            String fileId = photo.getFileId();
 
-            // SAVE DATA VIA API THEN SEND SUCCESSFULLY SAVED RESPONSE
+            try {
+              java.io.File localFile = downloadPhoto(fileId);
+              System.out.println("Photo saved to: " + localFile.getAbsolutePath());
 
-          } catch (IOException | TelegramApiException e) {
-            e.printStackTrace();
+              String fullName = userHistoryService.getLastValueByChatId(chatId, Label.FULL_NAME_ASKED);
+              String type = userHistoryService.getLastValueByChatId(chatId, Label.TYPE_ASKED);
+              String latitude = userHistoryService.getLastValueByChatId(chatId, Label.LOCATION_LATITUDE);
+              String longitude = userHistoryService.getLastValueByChatId(chatId, Label.LOCATION_LONGITUDE);
+
+              // SAVE DATA VIA API THEN SEND SUCCESSFULLY SAVED RESPONSE
+              String path = ApiService.createTree(fullName, type, latitude, longitude, "path");
+
+              // Send this photo with java telegram bot SendPhoto the path in the top
+              SendPhoto sendPhoto = new SendPhoto();
+              sendPhoto.setChatId(chatId);
+              sendPhoto.setPhoto(new InputFile(new File(path)));
+              execute(sendPhoto);
+            } catch (IOException | TelegramApiException e) {
+              e.printStackTrace();
+            }
           }
         }
       }
