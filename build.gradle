@@ -22,7 +22,9 @@ allprojects {
 }
 
 dependencies {
-	compileOnly 'org.projectlombok:lombok:1.18.20'
+    implementation 'com.google.code.gson:gson:2.8.8' // Or the latest version
+
+    compileOnly 'org.projectlombok:lombok:1.18.20'
 	annotationProcessor 'org.projectlombok:lombok:1.18.20'
 
 	testCompileOnly 'org.projectlombok:lombok:1.18.20'

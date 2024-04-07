@@ -31,7 +31,6 @@ import java.util.List;
 import java.util.UUID;
 
 import java.util.ArrayList;
-import java.util.List;
 
 @Slf4j
 @Component
@@ -147,7 +146,7 @@ public class TelegramBot extends TelegramLongPollingBot {
 
                   userHistoryService.create(Label.TYPE_ASKING, chatId, "NO_VALUE");
                 } else if (lastLabelByChatId.equals(Label.TYPE_ASKING)) {
-                  userHistoryService.create(Label.TYPE_ASKED, chatId, "NO_VALUE");
+                  userHistoryService.create(Label.TYPE_ASKED, chatId, messageText);
 
                   SendMessage sendMessage = new SendMessage();
                   sendMessage.setText("Joylashuvni kiriting: ");
@@ -182,9 +181,7 @@ public class TelegramBot extends TelegramLongPollingBot {
           } else if (role.equals(Role.ROLE_USER)) {
           } else if (role.equals(Role.ROLE_OWNER)) {
           }
-        }
-
-        else if (update.hasMessage() && update.getMessage().hasLocation()) {
+        } else if (update.hasMessage() && update.getMessage().hasLocation()) {
           Label lastLabelByChatId = userHistoryService.getLastLabelByChatId(chatId);
           if (lastLabelByChatId.equals(Label.TREE_LOCATION_ASKING)) {
             Location location = update.getMessage().getLocation();
@@ -204,7 +201,11 @@ public class TelegramBot extends TelegramLongPollingBot {
           Label lastLabelByChatId = userHistoryService.getLastLabelByChatId(chatId);
 
           if (lastLabelByChatId.equals(Label.TREE_PHOTO_ASKING)) {
-            sendMessage(chatId, "<b>Daraxt muvafaqqiyatli yaratildi!</b>");
+            sendMessageWithKeyboardButtons(
+              chatId,
+              "<b>Daraxt muvafaqqiyatli yaratildi!</b>",
+              List.of("Daraxt qo'shish ➕", "Daraxtlar haqida ma'lumot \uD83C\uDF33")
+            );
 
             List<PhotoSize> photos = update.getMessage().getPhoto();
             // Sort photos by file size, to get the largest one
@@ -217,26 +218,36 @@ public class TelegramBot extends TelegramLongPollingBot {
               java.io.File localFile = downloadPhoto(fileId);
               System.out.println("Photo saved to: " + localFile.getAbsolutePath());
 
+              String photoId = ApiService.uploadImage(localFile.getAbsolutePath());
+
               String fullName = userHistoryService.getLastValueByChatId(chatId, Label.FULL_NAME_ASKED);
               String type = userHistoryService.getLastValueByChatId(chatId, Label.TYPE_ASKED);
               String latitude = userHistoryService.getLastValueByChatId(chatId, Label.LOCATION_LATITUDE);
               String longitude = userHistoryService.getLastValueByChatId(chatId, Label.LOCATION_LONGITUDE);
 
               // SAVE DATA VIA API THEN SEND SUCCESSFULLY SAVED RESPONSE
-              String path = ApiService.createTree(fullName, type, latitude, longitude, "path");
+              String path = ApiService.createTree(fullName, type, latitude, longitude, photoId);
 
               // Send this photo with java telegram bot SendPhoto the path in the top
               SendPhoto sendPhoto = new SendPhoto();
               sendPhoto.setChatId(chatId);
               sendPhoto.setPhoto(new InputFile(new File(path)));
-              execute(sendPhoto);
-            } catch (IOException | TelegramApiException e) {
-              e.printStackTrace();
+              try {
+                execute(sendPhoto);
+              } catch (TelegramApiException ignored) {
+
+              }
+
+
+
+            } catch (TelegramApiException e) {
+              throw new RuntimeException(e);
+            } catch (IOException e) {
+              throw new RuntimeException(e);
             }
           }
         }
       }
-
     } else if (update.hasCallbackQuery()) {
     }
   }
